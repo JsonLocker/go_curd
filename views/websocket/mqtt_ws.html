@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT over WebSocket</title>
+    <script src="/asset/js/mqtt.min.js"></script>
+    <script src="/asset/js/main.js"></script>
+</head>
+
+<body>
+    <h2>MQTT Over WebSocket</h2>
+    <a href="https://www.emqx.com/en/blog/mqtt-js-tutorial">mqtt js tutorial</a>
+    <div id="message_list"></div>
+    <input type="text" id="message_input" placeholder="message">
+    <div id="status"></div>
+</body>
+<script>
+
+    // https://www.emqx.com/en/blog/mqtt-js-tutorial
+    // https://github.com/mqttjs/MQTT.js#mqttclientstreambuilder-options
+
+    var mqtt_client,mqtt_client_id, mqtt_qos,mqtt_topic= null
+
+    // 连接mqtt
+    function ConnectMQTT(connectUrl,clientId,username,password) {
+        const options = {
+            keepalive: 60,
+            clientId: clientId,
+            clean: true,
+            connectTimeout: 30 * 1000,
+            username: username,
+            password: password,
+            reconnectPeriod: 1000,
+        }
+        mqtt_qos = 0
+        showStatus('connecting mqtt mqtt_client')
+        mqtt_client = mqtt.connect(connectUrl, options)
+
+        // 监听连接状态:错误
+        mqtt_client.on('error', (err) => {
+            showStatus('Connection Error:' + err.message)
+            mqtt_client.end()
+        })
+        // 监听连接状态:重新连接
+        mqtt_client.on('reconnect', () => {
+            showStatus('Reconnecting!')
+        })
+
+        // 监听连接状态:连接成功
+        mqtt_client.on('connect', () => {
+            connectHandler()
+        })
+
+        // 接收信息
+        mqtt_client.on('message', (topic, payload) => {
+            recsiveHandler(payload.toString(), topic)
+        })
+    }
+
+    // 订阅主题
+    function subscribes() {
+        mqtt_client.subscribe(mqtt_topic, { mqtt_qos }, (error) => {
+            if (error) {
+                return showStatus('==========> Subscribe error:', error)
+            }
+            showStatus(`Subscribe to mqtt_ ${mqtt_topic}`)
+        })
+    }
+
+    // 发布信息
+    function publish(message) {
+        mqtt_client.publish(mqtt_topic , message, { mqtt_qos }, (error) => {
+            if (error) {
+                showStatus('publish error:', error)
+            }
+        })
+    }
+
+    // 取消订阅
+    function unsubscribe() {
+        mqtt_client.unsubscribe(mqtt_topic, { mqtt_qos }, (error) => {
+            if (error) {
+                showStatus('unsubscribe error:', error)
+                return
+            }
+            showStatus(`unsubscribed topic: ${mqtt_topic}`)
+        })
+    }
+
+    // 关闭连接
+    function disconnect() {
+        if (mqtt_client.connected) {
+            try {
+                mqtt_client.end(false, () => {
+                    showStatus('disconnected successfully')
+                })
+            } catch (error) {
+                showStatus('disconnect error:', error)
+            }
+        }
+    }
+    
+    //////////////////////////////////////  下面是后续自定义内容 //////////////////////////////////////
+
+    // 显示状态
+    function showStatus(text){
+        document.querySelector('#status').innerHTML = text
+    }
+
+    // 连接成功处理逻辑
+    function connectHandler(){
+        showStatus(`connect! mqtt_client id : ${mqtt_client_id}`)
+        subscribes()
+    }
+
+    // 接收消息渲染
+    function recsiveHandler(message) {
+        console.log(`Received message: ${message} from topic: ${mqtt_topic}`)
+    }
+
+    // 初始化客户端
+    function initClient(){
+        mqtt_client_id = "mqttjs_" + Math.random().toString(16).substring(2, 8)
+        let connectUrl = "ws://192.3.16.92:8083/mqtt"
+        let username = "slq17"
+        let password = "connie"
+        mqtt_topic = 'mqtt/czzor'
+        ConnectMQTT(connectUrl,mqtt_client_id, username, password) // 连接mqtt服务器
+    }
+    
+    // 页面加载完成后连接mqtt服务器
+    window.onload = function() {
+        setTimeout(() => {
+            initClient()
+        }, 1000)
+    }
+
+
+</script>
+
+</html>
