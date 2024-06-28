@@ -2,35 +2,60 @@
 <html>
 
 <head>
-	<title>WebSocket 测试页面</title>
+	<title>WebSocket 测试页面1</title>
 </head>
 
 <body>
-	<h1>WebSocket 测试页面</h1>
+	<h1>WebSocket 测试页面3</h1>
 	<input type="text" id="message" placeholder="Type a message...">
 	<button onclick="sendMessage()">Send</button>
 	<hr>
 	<div id="output"></div>
 
 	<script>
-		let secure = window.location.protocol.includes('https') ? 's' : '';
-		var socket = new WebSocket("ws" + secure + "://" + window.location.host + "/ws/chat");
+		var socket = null
+		var client_id = new Date().getTime().toString(16).slice(2,8)
+		var room_id = "chatroom1"
 
-		socket.onopen = function (event) {
-			console.log("WebSocket connected!");
+		// 创建客户端
+		function initClient(socket_url){
+			socket = new WebSocket(socket_url);
+			socket.onopen = function (event) {
+				console.log("WebSocket connected!");
+			}
+
+			socket.onmessage = function (event) {
+				console.log("Received message:", event.data);
+				document.getElementById("output").innerHTML += event.data + "<br>";
+			}
 		}
 
-		socket.onmessage = function (event) {
-			console.log("Received message:", event.data);
-			document.getElementById("output").innerHTML += event.data + "<br>";
-		}
-
+		// 发送信息
 		function sendMessage() {
-			var message = document.getElementById("message").value.trim();
+			let msgObj = {
+				client_id : client_id,
+				role : "teacher",
+				room_id : room_id,
+				action: "chat",
+				message : document.getElementById("message").value.trim()
+			}
+
+			let message = JSON.stringify(msgObj);
+
 			socket.send(message);
 			document.getElementById("message").value = "";
 			console.log("Sent message:", message);
 		}
+
+		// 创建
+		window.onload = ()=>{
+			let secure = window.location.protocol.includes('https') ? 's' : '';
+			let socket_url = "ws" + secure + "://" + window.location.host + "/ws/chat";
+			setTimeout(()=>{
+				initClient(socket_url);
+			},500)
+		}
+
 	</script>
 </body>
 

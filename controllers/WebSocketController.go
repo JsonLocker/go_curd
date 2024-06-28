@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -9,7 +10,29 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type WebSocketController struct{}
+type WebSocketController struct {
+	ClientId string `json:"client_id"`
+	Role     string `json:"role"`
+	RoomId   string `json:"room_id"`
+	Action   string `json:"action"`
+	Message  string `json:"message"`
+}
+
+// 连线客户端
+type Client struct {
+	Ws     *websocket.Conn
+	UserId string
+}
+
+type Room struct {
+	Id         string
+	Clients    map[string]*Client
+	Client_ids []string
+}
+
+var Clients = make(map[string]*Client) // 客户端列表
+
+var Rooms = make(map[string]any) // 房间客户端列表
 
 // Chat handles the chat page
 func (s *WebSocketController) Index(ctx *gin.Context) {
@@ -33,15 +56,18 @@ func (s *WebSocketController) Chat(c *gin.Context) {
 
 	for {
 		messageType, message, err := ws.ReadMessage()
+
+		clientId := addClient(string(message), ws) // 存入客户端信息
+
 		if err != nil {
 			fmt.Println("read:", err)
 			break
 		}
-
 		switch messageType {
 		case websocket.TextMessage:
 			fmt.Println("text message11:", string(message))
-			ws.WriteMessage(websocket.TextMessage, message)
+			Clients[clientId].Ws.WriteMessage(websocket.TextMessage, []byte("message received, from client id :"+clientId))
+			// ws.WriteMessage(websocket.TextMessage, message) //原始发送信息
 		case websocket.BinaryMessage:
 			fmt.Println("this is file type")
 		case websocket.CloseMessage:
@@ -56,7 +82,21 @@ func (s *WebSocketController) Chat(c *gin.Context) {
 			fmt.Println("unknown message type:", messageType)
 		}
 	}
+}
 
+// 根据信息把信息里面client存入client数组
+func addClient(message string, ws *websocket.Conn) string {
+	// 解析客户端信息
+	clientInfo := WebSocketController{}
+	err := json.Unmarshal([]byte(message), &clientInfo)
+	if err != nil {
+		fmt.Println("unmarshal:", err)
+		return ""
+	}
+	// 存入客户端信息
+	client := &Client{Ws: ws, UserId: clientInfo.ClientId}
+	Clients[client.UserId] = client
+	return client.UserId
 }
 
 /**

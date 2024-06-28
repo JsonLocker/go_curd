@@ -15,7 +15,7 @@ func init() {
 }
 
 func main() {
-	//gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 	Router := gin.Default()
 	routers.WebRouter(Router)    // 页面路由器
 	go routers.ApiRouter(Router) // api路由器

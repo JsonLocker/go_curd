@@ -1,0 +1,6 @@
+# Ignore all files inside the .vscode directory
+.vscode/
+.vscode/sftp.json
+
+# Ignore all goCurd files
+*goCurd

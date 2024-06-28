@@ -1,0 +1,129 @@
+<script>
+    class MyIndexDB {
+        // 构造函数 indexKey 为索引列
+        constructor(dbName, version, storeName, indexkey = "name") {
+            this.dbName = dbName;
+            this.indexName = indexkey;
+            this.version = version;
+            this.storeName = storeName;
+            this.db = null;
+        }
+        // 1. 连接
+        conn() {
+            const request = indexedDB.open(this.dbName, this.version);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    let store = db.createObjectStore(this.storeName, { keyPath: 'id', autoIncrement: true });
+                    store.createIndex("nameIndex", this.indexName, { unique: false });
+                }
+            };
+            request.onsuccess = (event) => {
+                this.db = event.target.result;
+            };
+            request.onerror = (event) => {
+                console.error('Database error:', event.target.error);
+            };
+        }
+
+        // 2. 更新数据,如果json_data携带id则为更新操作
+        async store(json_data) {
+            const transaction = this.db.transaction([this.storeName], "readwrite"); //创建事务
+            const store = transaction.objectStore(this.storeName);  //获取空间
+            const request = store.put(json_data);
+            let data = await this.fetch(request);
+            return data.name
+        }
+
+        // 3.1 查询: 根据自增id查询结果
+        async get(key) {
+            const transaction = this.db.transaction([this.storeName], "readonly");
+            const store = transaction.objectStore(this.storeName);
+            let request = store.get(key);
+            return await this.fetch(request);
+        }
+
+        // 3.2 查询:  根据索引查询
+        async query(keyword) {
+            const transaction = this.db.transaction([this.storeName], "readonly");
+            const store = transaction.objectStore(this.storeName);
+            let cursorRequest
+            if (keyword != "") {
+                let nameIndex = store.index("nameIndex");
+                let range = IDBKeyRange.only(keyword);
+                cursorRequest = nameIndex.openCursor(range);
+            } else {
+                cursorRequest = store.openCursor();
+            }
+            return new Promise((resolve, reject) => {
+                let result = []
+                cursorRequest.onsuccess = function (event) {
+                    const cursor = event.target.result;
+                    if (cursor) {
+                        result.push(cursor.value)
+                        cursor.continue();
+                    }
+                    return resolve(result)
+                }
+            })
+        }
+
+        // 4. 删除id
+        async del(key) {
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+            const request = store.delete(key);
+            let data = await this.fetch(request);
+            return data
+        }
+
+        // 5. 外部使用
+        async operate(data, isDelete = false) {
+            let type = typeof (data)
+            let result
+            switch (type) {
+                case "number":                          // 根据id 查询 或 删除
+                    if (isDelete) {
+                        result = await indexDB.del(data)
+                    } else {
+                        result = await indexDB.get(data)
+                    }
+                    break;
+                case "string":                          // 根据name列查询,返回数组,空字符串返回所有值数组
+                    result = await indexDB.query(data)
+                    break;
+                case "object":                          // 新增数据,携带id则为更新数据
+                    result = await indexDB.store(data)
+                    break;
+            }
+            console.log(result)
+            return result
+        }
+
+        // 异步获取数据
+        fetch(request) {
+            return new Promise((resolve, reject) => {
+                request.onsuccess = function (event) {
+                    if (event.target.result) {
+                        return resolve(event.target.result)
+                    } else {
+                        return resolve(null)
+                    }
+                };
+            })
+        }
+    }
+
+///////////////////////////////////////////////////  使用方法   ///////////////////////////////////////////////////
+//    // 1 实例化
+//    const indexDB = new MyIndexDB("myDatabase", 1, "myStore");
+//    indexDB.conn()
+
+//    // 2. 在需要的异步函数内部调用operate方法
+//    async function demo() {
+//        let data = { name: "bb", data: new Date().getTime() }
+//        let b = await indexDB.operate(data)
+//        console.log(b)
+//    }, 500)
+
+</script>
